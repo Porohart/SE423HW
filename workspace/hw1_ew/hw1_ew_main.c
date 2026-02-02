@@ -19,7 +19,7 @@
 #include "song.h"
 #include "dsp.h"
 #include "fpu32/fpu_rfft.h"
-#include "led.c"
+#include "led.h"
 
 #define PI          3.1415926535897932384626433832795
 #define TWOPI       6.283185307179586476925286766559
@@ -311,7 +311,7 @@ void main(void)
             time = timeint*offset;
             sinvalue = ampl*sin(2*PI*frequency*time) + offset;
             satvalue = saturate(sinvalue, sat_limit);
-            serial_printf(&SerialA, "timeint = %ld, time = %.2fsec, input = %.3f, SatOut = %.2f", timeint, time, sinvalue, satvalue)
+            serial_printf(&SerialA, "timeint = %ld, time = %.2fsec, input = %.3f, SatOut = %.2f", timeint, time, sinvalue, satvalue);
             UARTPrint = 0; // EW: Here if there is no UARTPrint = 0, the if condition of this loop will always be true
                            //     and it will print every loop of the while loop instead of every 50 times isr2 fires
         }
@@ -350,14 +350,24 @@ __interrupt void cpu_timer0_isr(void)
 //        PieCtrlRegs.PIEIFR12.bit.INTx9 = 1;  // Manually cause the interrupt for the SWI
 //    }
 
-    if ((numTimer0calls%250) == 0) {
-        displayLEDletter(LEDdisplaynum);
-        LEDdisplaynum++;
-        if (LEDdisplaynum == 0xFFFF) {  // prevent roll over exception
-            LEDdisplaynum = 0;
+//    if ((numTimer0calls%250) == 0) {
+//        displayLEDletter(LEDdisplaynum);
+//        LEDdisplaynum++;
+//        if (LEDdisplaynum == 0xFFFF) {  // prevent roll over exception
+//            LEDdisplaynum = 0;
+//        }
+//        if(led_mode == MANUAL) led_mode = SEQUENCE;
+//        else led_mode = MANUAL;
+//    }
+
+    if((numTimer0calls % 100) == 0) {
+        if(GpioDataRegs.GPADAT.bit.GPIO5 == 0) {
+            if(led_mode == MANUAL) led_mode = SEQUENCE;
+            else led_mode = MANUAL;
+            for(int i = 0; i < 16; i++) {
+                ledctl(i, CLEAR);
+            }
         }
-        if(led_mode == MANUAL) led_mode = SEQUENCE;
-        else led_mode = MANUAL;
     }
 
 	// Blink LaunchPad Red LED
@@ -373,8 +383,8 @@ __interrupt void cpu_timer1_isr(void)
     if(led_mode == SEQUENCE) {
         int idx = CpuTimer1.InterruptCount % 16;
         if(idx > 0) {
-            ledclt(idx - 1, CLEAR);
-        } else if(idk == 0) {
+            ledctl(idx - 1, CLEAR);
+        } else if(idx == 0) {
             ledctl(led_count - 1, CLEAR);
         }
         ledctl(idx, SET);
@@ -397,12 +407,12 @@ __interrupt void cpu_timer2_isr(void)
             GpioDataRegs.GPBTOGGLE.bit.GPIO60 = 1;
 
             // EW: I am putting these checks within this many timer iterations because if it checked every interrupt it would toggle too fast to see
-            if(GpioDataRegs.GPADAT.bit.GPIO4 == 1) {
+            if(GpioDataRegs.GPADAT.bit.GPIO4 == 0) {
                 GpioDataRegs.GPBTOGGLE.bit.GPIO61 = 1;
                 GpioDataRegs.GPETOGGLE.bit.GPIO157 = 1;
             }
 
-            if(GpioDataRegs.GPADAT.bit.GPIO7 == 1) {
+            if(GpioDataRegs.GPADAT.bit.GPIO7 == 0) {
                 GpioDataRegs.GPETOGGLE.bit.GPIO158 = 1;
                 GpioDataRegs.GPETOGGLE.bit.GPIO159 = 1;
             }
